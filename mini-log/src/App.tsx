@@ -18,7 +18,7 @@ import { BarList, Columns, Donut } from './Charts';
 import { GoalBar } from './GoalBar';
 import { CategoryPick } from './CategoryPick';
 import { isStructure, outlineText, POST_TYPES, STRUCTURES, type PostType, type Structure } from '../functions/_postTypes';
-import { api, ApiError, APP_LINKS, formatNumber } from '../../shared/client/api';
+import { abortAll, api, ApiError, APP_LINKS, formatNumber } from '../../shared/client/api';
 import { Tomong, Signature } from './Tomong';
 import { renumberMarkers } from './photoMarkers';
 import { fullText, instaCheck, instagramText, photoFileName } from './publishKit';
@@ -255,6 +255,7 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
   }
 
   async function logout() {
+    abortAll(); // 아직 오는 중인 요청은 멈춘다
     try { await api('/api/logout', { method: 'POST', body: {} }); } catch { /* 화면은 로그아웃 */ }
     onLogout();
   }
