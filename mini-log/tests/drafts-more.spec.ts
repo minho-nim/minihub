@@ -14,7 +14,9 @@ test('원고가 200개를 넘으면 목록 끝에 이전 원고 더 보기가 �
   });
   try {
     await page.reload();
-    const list = page.getByRole('navigation', { name: '원고' });
+    await page.goto('/#mine'); // 원고 목록은 '내 글' 화면으로 옮김(원고만 보기)
+    await page.getByRole('group', { name: '종류' }).getByRole('button', { name: /^원고/ }).click();
+    const list = page.getByRole('table', { name: '내 글' });
     await expect(list.getByRole('button')).toHaveCount(200);
     const more = page.getByRole('button', { name: '이전 원고 더 보기' });
     await expect(more).toBeVisible();

@@ -46,7 +46,8 @@ test('원고 여러 개 골라 지우기와 한 번에 되돌리기, 남의 원�
   const ids: string[] = [];
   for (const t of ['정리 시험 1', '정리 시험 2', '남길 원고']) { const id = (await call(page, '/api/drafts', 'POST', {})).data.draft.id; await call(page, `/api/drafts/${id}`, 'PUT', { title: t }); ids.push(id); }
   await page.reload();
-  const list = page.getByRole('navigation', { name: '원고' });
+  await page.goto('/#mine'); // 원고 목록·여러 개 지우기는 '내 글' 화면으로 옮김
+  const list = page.getByRole('table', { name: '내 글' });
   await page.getByRole('button', { name: '여러 개 지우기' }).click();
   await list.getByLabel(/정리 시험 1/).check();
   await list.getByLabel(/정리 시험 2/).check();

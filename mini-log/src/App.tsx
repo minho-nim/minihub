@@ -7,6 +7,7 @@ import { NavIcon } from './NavIcon';
 import { FirstSteps } from './FirstSteps';
 import { PushCard, usePhone } from './Brief';
 import { ConnectCard } from './Connect';
+import { MineView } from './Mine';
 import { orderedTypes, outlineOf, PostTypesCard, usePostTypes } from './PostTypes';
 import { TodayBoard } from './Today';
 import { setUiPrefs, type UiPrefs } from './uiPrefs';
@@ -264,8 +265,31 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
     const current = list.find(d => d.id === selectedId);
     return current && current.photo_count !== n ? list.map(d => (d.id === selectedId ? { ...d, photo_count: n } : d)) : list;
   }), [selectedId]);
-  const onDeleted = useCallback((id: string) => { setDrafts(list => list?.filter(d => d.id !== id) ?? null); setSelectedId(null); }, []);
+  const onDeleted = useCallback((id: string) => { setDrafts(list => list?.filter(d => d.id !== id) ?? null); setSelectedId(null); setView('mine'); }, []); // 지우면 '내 글'로
 
+  // '내 글' 화면에 넘기는 조각: 여러 개 지우기 막대, 이전 원고 더 보기
+  const pickBar = drafts && drafts.length > 0 ? (
+          <div className="pick-bar">
+            {!picking ? <button type="button" className="btn ghost small" onClick={() => { setPicking(true); setPicked(new Set()); }}>여러 개 지우기</button> : (
+              <>
+                <button type="button" className="btn ghost small" onClick={() => setPicked(p => (p.size === drafts.length ? new Set() : new Set(drafts.map(d => d.id))))}>{picked.size === drafts.length ? '모두 풀기' : '모두 고르기'}</button>
+                <button type="button" className="btn small danger" disabled={!picked.size || removing} onClick={() => { void removePicked(); }}>{removing ? '지우는 중…' : `${picked.size}개 지우기`}</button>
+                <button type="button" className="btn ghost small" onClick={() => { setPicking(false); setPicked(new Set()); }}>취소</button>
+              </>
+            )}
+          </div>
+  ) : null;
+  const olderButton = olderCursor ? (
+          <button className="btn ghost small" disabled={loadingOlder} onClick={async () => {
+            setLoadingOlder(true);
+            try {
+              const data = await api<{ drafts: Draft[]; more?: boolean; next_before?: string | null }>(`/api/drafts?before=${encodeURIComponent(olderCursor)}`);
+              setDrafts(list => { const seen = new Set((list ?? []).map(d => d.id)); return [...(list ?? []), ...data.drafts.filter(d => !seen.has(d.id))]; });
+              setOlderCursor(data.more ? data.next_before ?? null : null);
+            } catch (error) { setListError(error instanceof Error ? error.message : '이전 원고를 불러오지 못했어요.'); }
+            finally { setLoadingOlder(false); }
+          }}>{loadingOlder ? '불러오는 중…' : '이전 원고 더 보기'}</button>
+  ) : null;
   return (
     <div className={`shell${selected || view !== 'drafts' ? ' editing' : ''}`}>
       <UndoToast />
@@ -281,11 +305,11 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
           </button>
           {SIDE_SECTIONS.map(section => (
             <div key={section.label} className="view-group" role="group" aria-label={section.label}>
-              <span className="view-group-label" aria-hidden="true">{section.label}</span>
+              <span className="view-group-label big" aria-hidden="true"><NavIcon name={section.icon} size={19} />{section.label}</span>
               {section.keys.map(key => (
-                <button key={key} type="button" aria-current={menuKeyOf(view) === key && (key !== 'drafts' || !!selected)} onClick={() => go(key)}>
+                <button key={key} type="button" className="sub" aria-current={menuKeyNow(view, !!selected) === key} onClick={() => go(key)}>
                   <NavIcon name={key} />{VIEW_LABEL[key]}
-                  {key === 'drafts' && drafts && drafts.length > 0 && <span className="nav-count" aria-hidden="true">{drafts.length}</span>}
+                  {key === 'mine' && drafts && drafts.length > 0 && <span className="nav-count" aria-hidden="true">{drafts.length}</span>}
                   {key === 'mail' && mailWaiting > 0 && <span className="nav-badge" aria-label={`답장 기다리는 메일 ${mailWaiting}통`}>{mailWaiting}</span>}
                   {key === 'campaigns' && todo.deal > 0 && <span className="nav-badge" aria-label={`협찬 할 일 ${todo.deal}개`}>{todo.deal}</span>}
                 </button>
@@ -296,6 +320,8 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
         {phone && view === 'drafts' && !selected && <TodayBoard user={me.user} name={me.name} drafts={drafts ?? []} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onCreate={() => { void create(); }} onGo={t => go(t)} />}
         {listError && <p className="error" role="alert">{listError}</p>}
         {drafts === null && !listError && <Skeleton rows={4} compact label="원고 목록을 불러오는 중…" />}
+        {/* 원고 목록·빈 원고 안내·여러 개 지우기는 '내 글' 화면으로 옮김(원고가 많아도 옆 메뉴가 길어지지 않게). 예전 옆 목록은 코드만 남김(SHOW_SIDE_LIST) */}
+        {SHOW_SIDE_LIST && (<>
         {drafts?.length === 0 && (
           <div className="list-empty">
             <Tomong kind="minilog" size={44} />
@@ -340,6 +366,7 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
             finally { setLoadingOlder(false); }
           }}>{loadingOlder ? '불러오는 중…' : '이전 원고 더 보기'}</button>
         )}
+        </>)}
         <button type="button" className="side-settings" aria-current={view === 'settings'} onClick={() => go('settings')}><NavIcon name="settings" />설정</button>
         <div className="side-foot">
           <a className="btn ghost small" href={APP_LINKS.hub}>hub</a>
@@ -381,11 +408,14 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
         : view === 'structure' ? <StructureView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'blog' ? <BlogView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'calendar' ? <CalendarView drafts={drafts ?? []} onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onCreate={date => { void create(date); }} onSaved={list => list.forEach(onSaved)} />
+        : view === 'mine' ? <MineView drafts={drafts} creating={creating} onCreate={() => { void create(); }} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onMail={() => setView('mail')}
+            pickBar={pickBar} picking={picking} picked={picked} onPick={id => setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; })} olderButton={olderButton}
+            rhythm={drafts && drafts.length > 0 ? <WeekRhythm drafts={drafts} /> : null} />
         : view === 'settings' ? <SettingsView name={me.name} onRenamed={onRenamed} onBack={() => setView('drafts')} />
         : view === 'dashboard' ? <DashboardView onBack={() => setView('drafts')} onOpen={id => { setSelectedId(id); setView('drafts'); }} onCampaigns={() => setView('campaigns')} />
         : view === 'campaigns' ? <CampaignsView drafts={drafts ?? []} onCompose={seed => { setMailSeed(seed); setView('mail'); }} onDraftsChanged={() => { void refresh(); }} onProposal={() => setView('proposal')} onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} shared={shared} />
         : selected
-          ? <Editor key={selected.id} draft={selected} gemini={me.gemini.connected} otherTitles={(drafts ?? []).filter(d => d.id !== selected.id && d.title.trim()).map(d => d.title)} onSaved={onSaved} onCopied={copy => setDrafts(list => [copy, ...(list ?? [])])} onPhotoCount={onPhotoCount} onDeleted={onDeleted} onRestored={d => { setDrafts(list => [d, ...(list ?? []).filter(x => x.id !== d.id)]); setSelectedId(d.id); setView('drafts'); }} onBack={() => setSelectedId(null)} />
+          ? <Editor key={selected.id} draft={selected} gemini={me.gemini.connected} otherTitles={(drafts ?? []).filter(d => d.id !== selected.id && d.title.trim()).map(d => d.title)} onSaved={onSaved} onCopied={copy => setDrafts(list => [copy, ...(list ?? [])])} onPhotoCount={onPhotoCount} onDeleted={onDeleted} onRestored={d => { setDrafts(list => [d, ...(list ?? []).filter(x => x.id !== d.id)]); setSelectedId(d.id); setView('drafts'); }} onBack={() => { setSelectedId(null); setView('mine'); }} />
           : (
             <div className="stack">
             {!phone && <TodayBoard user={me.user} name={me.name} drafts={drafts ?? []} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onCreate={() => { void create(); }} onGo={t => go(t)} />}
@@ -406,16 +436,16 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
         <>
           {group && group.keys.length > 1 && (
             <nav className="m-chips" aria-label={`${group.label} 메뉴`}>
-              {group.keys.map(key => <button key={key} type="button" aria-current={menuKeyOf(view) === key} onClick={() => go(key)}>{VIEW_LABEL[key]}</button>)}
+              {group.keys.map(key => <button key={key} type="button" aria-current={menuKeyNow(view, !!selected) === key} onClick={() => go(key)}>{VIEW_LABEL[key]}</button>)}
               <button type="button" className="m-gear" aria-label="설정" onClick={() => go('settings')}><NavIcon name="settings" size={20} /></button>
             </nav>
           )}
           {(!group || group.keys.length === 1) && <button type="button" className="m-gear m-gear-alone" aria-label="설정" onClick={() => go('settings')}><NavIcon name="settings" size={20} /></button>}
-          {view === 'drafts' && <button type="button" className="m-fab" aria-label="새 원고" disabled={creating} onClick={() => { void create(); }}><NavIcon name="plus" size={24} /></button>}
+          {(view === 'drafts' || view === 'mine') && <button type="button" className="m-fab" aria-label="새 원고" disabled={creating} onClick={() => { void create(); }}><NavIcon name="plus" size={24} /></button>}
           <nav className="m-tabs" aria-label="미니로그 묶음">
             {GROUPS.map(g => (
-              <button key={g.id} type="button" aria-label={`${g.label} 묶음`} aria-current={group?.id === g.id} onClick={() => go(g.keys[0])}>
-                <span className="m-tab-icon"><NavIcon name={g.keys[0]} size={20} />{g.id === 'deal' && mailWaiting > 0 && <span className="m-tab-dot" aria-hidden="true" />}</span>{g.label}
+              <button key={g.id} type="button" aria-label={`${g.label} 묶음`} aria-current={(selected && view === 'drafts' ? 'make' : group?.id) === g.id} onClick={() => { if (g.id === 'today') setSelectedId(null); go(g.keys[0]); }}>
+                <span className="m-tab-icon"><NavIcon name={g.icon} size={20} />{(g.id === 'today' ? todo.all : g.id === 'deal' ? todo.deal + mailWaiting : 0) > 0 && <span className="m-tab-badge" aria-hidden="true" data-n={g.id === 'today' ? todo.all : todo.deal + mailWaiting} />}</span>{g.label}
               </button>
             ))}
           </nav>
@@ -434,26 +464,26 @@ function readRoute(): { view: View; draftId: string | null } {
 }
 const routeHash = (view: View, draftId: string | null) => (view === 'drafts' ? (draftId ? `#draft/${draftId}` : '#drafts') : `#${view}`);
 
-type View = 'drafts' | 'proposal' | 'report' | 'ideas' | 'calendar' | 'dashboard' | 'campaigns' | 'blog' | 'structure' | 'style' | 'mail' | 'settings';
+type View = 'drafts' | 'mine' | 'proposal' | 'report' | 'ideas' | 'calendar' | 'dashboard' | 'campaigns' | 'blog' | 'structure' | 'style' | 'mail' | 'settings';
 const SIDE_W = { min: 300, max: 680, def: 400, key: 'minilog.editor.sideWidth' };
 const clampSide = (n: number) => Math.min(SIDE_W.max, Math.max(SIDE_W.min, Math.round(n)));
-const VIEW_LABEL: Record<Exclude<View, 'proposal'>, string> = { drafts: '원고', ideas: '글감', style: '문체', calendar: '캘린더', campaigns: '협찬', mail: '메일', dashboard: '대시보드', report: '월간보고', blog: '블로그', structure: '구조', settings: '설정' };
+const SHOW_SIDE_LIST = false;
+const VIEW_LABEL: Record<Exclude<View, 'proposal'>, string> = { drafts: '오늘', mine: '내 글', ideas: '글감', style: '문체', calendar: '캘린더', campaigns: '협찬', mail: '메일', dashboard: '대시보드', report: '월간보고', blog: '블로그', structure: '구조', settings: '설정' };
 type MenuView = Exclude<View, 'proposal' | 'structure' | 'settings'>;
 // 메뉴 묶음 4개(휴대폰 아래 탭과 같음). 구조는 '블로그' 안에서 바꿔 보고, 설정은 맨 아래 따로
-const GROUPS: { id: string; label: string; keys: MenuView[] }[] = [
-  { id: 'make', label: '만들기', keys: ['drafts', 'ideas', 'style'] },
-  { id: 'plan', label: '일정', keys: ['calendar'] },
-  { id: 'deal', label: '협찬', keys: ['campaigns', 'mail'] },
-  { id: 'stats', label: '분석', keys: ['dashboard', 'report', 'blog'] },
+// 큰 묶음 4개(4-1) 아래 하는 일 순서의 하위 메뉴(4-2). 휴대폰은 큰 묶음이 아래 탭, 하위 메뉴는 위 칩
+const GROUPS: { id: string; label: string; icon: string; keys: MenuView[] }[] = [
+  { id: 'today', label: '오늘', icon: 'today', keys: ['drafts'] },
+  { id: 'make', label: '쓰기', icon: 'style', keys: ['mine', 'ideas', 'style', 'calendar'] },
+  { id: 'deal', label: '협찬', icon: 'campaigns', keys: ['campaigns', 'mail'] },
+  { id: 'stats', label: '분석', icon: 'dashboard', keys: ['dashboard', 'report', 'blog'] },
 ];
 // 넓은 화면 옆 메뉴는 묶음 이름 3개(일정·협찬은 메뉴가 적어 한 묶음으로 보임)
-const SIDE_SECTIONS: { label: string; keys: MenuView[] }[] = [
-  { label: '만들기', keys: GROUPS[0].keys },
-  { label: '일정 · 협찬', keys: [...GROUPS[1].keys, ...GROUPS[2].keys] },
-  { label: '분석', keys: GROUPS[3].keys },
-];
+const SIDE_SECTIONS = GROUPS.slice(1);
 /** 지금 화면이 어느 메뉴 칸에 불이 들어오는지(구조→블로그, 제안서→협찬) */
 const menuKeyOf = (v: View): MenuView | 'settings' => (v === 'structure' ? 'blog' : v === 'proposal' ? 'campaigns' : v);
+/** 원고를 연 동안은 '내 글'에 불이 들어온다 */
+const menuKeyNow = (v: View, editing: boolean) => (v === 'drafts' && editing ? 'mine' : menuKeyOf(v));
 const groupOf = (v: View) => GROUPS.find(g => (g.keys as string[]).includes(menuKeyOf(v))) ?? null;
 const VIEWS: Exclude<View, 'proposal'>[] = [...GROUPS.flatMap(g => g.keys), 'structure', 'settings'];
 
@@ -1008,6 +1038,10 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
   const typesHidden = Math.max(0, typeList.length - typesShown.length);
   // 원고 편집 2단(Buffer 작성 화면처럼): 쓰는 칸 옆에 점검·미리보기·올리기. '집중'을 누르면 옆 칸을 접는다(기기에 기억)
   const [focus, setFocus] = useState(() => { try { return localStorage.getItem('minilog.focus') === '1'; } catch { return false; } });
+  const [wmode, setWmode] = useState<'step' | 'all'>(() => { try { return localStorage.getItem('minilog.editor.mode') === 'step' ? 'step' : 'all'; } catch { return 'all'; } });
+  const setMode = (m: 'step' | 'all') => { setWmode(m); try { localStorage.setItem('minilog.editor.mode', m); } catch { /* 기억 못 해도 됨 */ } };
+  // 한 단계씩: 처음엔 아직 안 끝난 첫 단계부터(사진이 없으면 사진부터)
+  const [wstep, setWstep] = useState(() => (!draft.experience.trim() ? 0 : !draft.body.trim() ? 2 : draft.status === 'draft' ? 3 : 4));
   const toggleFocus = () => setFocus(f => { try { localStorage.setItem('minilog.focus', f ? '0' : '1'); } catch { /* 기억 못 해도 됨 */ } return !f; });
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
@@ -1190,6 +1224,13 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
     { key: 'post', label: '올리기', done: fields.status === 'published', target: 'ed-publish', action: '복사해서 블로그에 올리고 게시 완료 표시' },
   ];
   const nextStep = steps.find(st => !st.done && !st.optional) ?? null;
+  // '한 단계씩'(2-1 마법사): 한 단계 칸만 보이고 아래 [← 이전 · 다음] 자리는 고정. 오른쪽 남은 할 일(2-2)은 그대로. 고른 보기는 이 기기에 기억
+  const wizNext = (i: number) => (i === 0 ? '경험 적기' : i === 1 ? 'AI 초안' : i === 2 ? '점검·승인' : i === 3 ? (fields.status === 'draft' ? '승인하고 올리기로' : '올리기') : '');
+  const goNextStep = () => {
+    if (wstep === 3 && fields.status === 'draft') change({ status: 'approved' });
+    setWstep(w => Math.min(4, w + 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   return (
     <article className="stack" aria-label="원고 편집">
       <div className="editor-head">
@@ -1218,20 +1259,24 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
         <ol>
           {steps.map((st, i) => (
             <li key={st.key} className={st.done ? 'done' : st === nextStep ? 'now' : ''}>
-              <button type="button" onClick={() => jump(st.target)} aria-current={st === nextStep ? 'step' : undefined}>
+              <button type="button" onClick={() => (wmode === 'step' ? setWstep(i) : jump(st.target))} aria-current={(wmode === 'step' ? wstep === i : st === nextStep) ? 'step' : undefined}>
                 <span className="ed-step-n" aria-hidden="true">{st.done ? '✓' : i + 1}</span>{st.label}{st.optional && !st.done ? '(선택)' : ''}
               </button>
             </li>
           ))}
         </ol>
-        {nextStep ? <button type="button" className="btn primary small ed-next" onClick={() => jump(nextStep.target)}>다음: {nextStep.action} →</button>
-          : <span className="small muted">다 끝났어요. 7일 뒤 대시보드에서 돌아보기를 적어 주세요.</span>}
+        {wmode === 'all' && (nextStep ? <button type="button" className="btn primary small ed-next" onClick={() => jump(nextStep.target)}>다음: {nextStep.action} →</button>
+          : <span className="small muted">다 끝났어요. 7일 뒤 대시보드에서 돌아보기를 적어 주세요.</span>)}
+        <div className="seg ed-mode" role="group" aria-label="원고 보기">
+          <button type="button" aria-pressed={wmode === 'step'} onClick={() => setMode('step')}>한 단계씩</button>
+          <button type="button" aria-pressed={wmode === 'all'} onClick={() => setMode('all')}>한 화면에 다</button>
+        </div>
       </nav>
 
       {focus && <button type="button" className="side-handle" onClick={toggleFocus} aria-label="옆 칸 펴기">⟨ 점검·올리기</button>}
-      <div ref={colsRef} className={`editor-cols${focus ? ' focus' : ''}`} style={{ ['--side-w' as string]: `${sideW}px` }}>
+      <div ref={colsRef} className={`editor-cols${focus ? ' focus' : ''}${wmode === 'step' ? ` wiz-mode ws-${wstep}` : ''}`} style={{ ['--side-w' as string]: `${sideW}px` }}>
       <div className="editor-main" id="ed-write">
-      <section className="card step" aria-labelledby="s1">
+      <section className="card step" aria-labelledby="s1" data-wstep="0">
         <h2 id="s1" className="step-title"><span className="n">1</span>사진<span className="step-sub">{photos ? `${photos.length}/20장` : ''}</span></h2>
         {!storage ? (
           <div className="dropzone small">사진 저장소(R2)가 아직 연결되지 않아 사진을 올릴 수 없어요.</div>
@@ -1264,7 +1309,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
         )}
       </section>
 
-      <section className="card step" aria-labelledby="s2">
+      <section className="card step" aria-labelledby="s2" data-wstep="1">
         <h2 id="s2" className="step-title"><span className="n">2</span>실제 방문·사용 경험</h2>
         {/* 글 종류: 자주 쓴 3개(+ 고른 것)만 먼저, 나머지는 '+N개'로 */}
         <div className="type-pick" role="group" aria-label="글 종류">
@@ -1325,7 +1370,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
         {!gemini && <p className="muted small" style={{ margin: 0 }}>Gemini 키가 연결되면 쓸 수 있어요(hub 설정 참고).</p>}
       </section>
 
-      <section className="card step" aria-labelledby="s3">
+      <section className="card step" aria-labelledby="s3" data-wstep="2 3">
         <h2 id="s3" className="step-title"><span className="n">3</span>원고</h2>
         <div className="field">
           <label htmlFor="title">제목</label>
@@ -1369,7 +1414,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
       <DraftCheck draftId={draft.id} title={fields.title} body={fields.body} hashtags={fields.hashtags} photos={photos?.length ?? 0} postType={fields.post_type}
         sources={[fields.experience, ...(photos ?? []).map(p => p.note ?? '')].join('\n')} otherTitles={otherTitles} />
 
-      <section className="card step" aria-labelledby="s4" id="ed-publish">
+      <section className="card step" aria-labelledby="s4" id="ed-publish" data-wstep="4">
         <h2 id="s4" className="step-title"><span className="n">4</span>올리기·게시</h2>
         {fields.status === 'published' && published.url ? (
           <div className="published">
@@ -1484,6 +1529,13 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
         <button type="button" onClick={() => jump('ed-preview')}>미리보기</button>
         <button type="button" onClick={() => jump('ed-publish')}>올리기</button>
       </nav>
+      {/* 한 단계씩: 아래 버튼은 단계가 바뀌어도 같은 자리(이전 칸은 비어도 자리 유지) */}
+      {wmode === 'step' && (
+        <div className="wiz-foot ed-wiz-foot" role="group" aria-label="단계 이동">
+          <button type="button" className="btn ghost" style={{ visibility: wstep > 0 ? 'visible' : 'hidden' }} disabled={wstep === 0} onClick={() => { setWstep(w => Math.max(0, w - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>← {steps[Math.max(0, wstep - 1)].label}</button>
+          {wstep < 4 ? <button type="button" className="btn primary" onClick={goNextStep}>다음: {wizNext(wstep)} →</button> : <span className="small muted">마지막 단계예요. 복사해서 블로그에 올린 뒤 게시 완료를 눌러 주세요.</span>}
+        </div>
+      )}
     </article>
   );
 }

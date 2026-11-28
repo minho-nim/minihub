@@ -5,7 +5,7 @@ import { login } from './helpers';
 test('넓은 화면 메뉴: 묶음 이름 아래 한 줄에 하나, 지금 화면 표시, 블로그 안에서 구조로 바꿔 보기, 설정은 맨 아래', async ({ page }) => {
   await login(page, CODE_D);
   const nav = page.getByRole('navigation', { name: '미니로그 메뉴' });
-  await expect(nav.getByRole('group')).toHaveText([/만들기.*원고.*글감.*문체/, /일정 · 협찬.*캘린더.*협찬.*메일/, /분석.*대시보드.*월간보고.*블로그/]);
+  await expect(nav.getByRole('group')).toHaveText([/쓰기.*내 글.*글감.*문체.*캘린더/, /협찬.*협찬.*메일/, /분석.*대시보드.*월간보고.*블로그/] /* 메뉴 4-1×4-2로 바뀜(소유자 결정) */);
   await nav.getByRole('button', { name: '블로그', exact: true }).click();
   await expect(nav.getByRole('button', { name: '블로그', exact: true })).toHaveAttribute('aria-current', 'true');
   await page.getByRole('group', { name: '블로그 화면 고르기' }).getByRole('button', { name: '블로그 구조' }).click();
@@ -21,18 +21,20 @@ test('휴대폰 메뉴: 아래 탭 4개·묶음 안 칩·새 원고 둥근 버�
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, CODE_D);
   const tabs = page.getByRole('navigation', { name: '미니로그 묶음' });
-  await expect(tabs.getByRole('button')).toHaveText(['만들기', '일정', '협찬', '분석']);
+  await expect(tabs.getByRole('button')).toHaveText(['오늘', '쓰기', '협찬', '분석']); // 큰 묶음 4개(소유자 결정)
   await expect(page.getByRole('navigation', { name: '미니로그 메뉴' })).toBeHidden();
   await tabs.getByRole('button', { name: '협찬 묶음' }).click();
   await expect(page).toHaveURL(/#campaigns$/);
   const chips = page.getByRole('navigation', { name: '협찬 메뉴' });
   await chips.getByRole('button', { name: '메일', exact: true }).click();
   await expect(page).toHaveURL(/#mail$/);
-  await tabs.getByRole('button', { name: '일정 묶음' }).click();
+  await tabs.getByRole('button', { name: '쓰기 묶음' }).click();
+  await expect(page).toHaveURL(/#mine$/);
+  await page.getByRole('navigation', { name: '쓰기 메뉴' }).getByRole('button', { name: '캘린더', exact: true }).click(); // 캘린더는 '쓰기' 묶음 안으로
   await expect(page).toHaveURL(/#calendar$/);
   await page.getByRole('button', { name: '설정' }).click();
   await expect(page).toHaveURL(/#settings$/);
-  await tabs.getByRole('button', { name: '만들기 묶음' }).click();
+  await tabs.getByRole('button', { name: '쓰기 묶음' }).click();
   await page.getByRole('button', { name: '새 원고' }).click();
   await expect(page.getByLabel('제목')).toBeVisible();
   await expect(tabs).toBeHidden();

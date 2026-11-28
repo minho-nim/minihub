@@ -12,23 +12,22 @@ test('재탕 경고: 낱말이 많이 겹치는 다른 원고 제목만 찾는�
 test('원고 점검에 재탕 경고가 뜨고, 목록 위에 이번 주 게시 수가 보인다', async ({ page }) => {
   await login(page, CODE_C);
   for (const [i, title] of ['동네 빵집 소금빵 솔직 후기', '동네 빵집 소금빵 후기 2편'].entries()) {
-    const list = page.getByRole('navigation', { name: '원고' }).getByRole('button');
-    const before = i === 0 ? 0 : await list.count();
-    await page.getByRole('button', { name: '새 원고' }).click();
-    if (i) await expect(list).toHaveCount(before + 1); // 새 원고 화면으로 바뀐 뒤에 적는다(앞 원고에 적히지 않게)
+    await page.getByRole('button', { name: '새 원고' }).click(); // 새 원고 화면으로 바뀐 것은 아래 빈 제목으로 확인(앞 원고에 적히지 않게)
     await expect(page.getByLabel('제목')).toHaveValue('');
     await page.getByLabel('제목').fill(title);
     await expect(page.getByText('저장됨')).toBeVisible();
   }
-  await expect(page.getByLabel('이번 주 게시')).toContainText(/이번 주 게시 \d+편 · 권장 3~5편/);
   await expect(page.getByText(/비슷한 제목의 다른 원고 없음/)).toBeVisible();
   await expect(page.getByText(/‘동네 빵집 소금빵 솔직 후기’과 많이 겹쳐요/)).toBeVisible();
   { const t = page.getByRole('button', { name: '원고 메뉴' }); if (await t.getAttribute('aria-expanded') !== 'true') await t.click(); } // 화면 정리로 메뉴·접기 안에 들어가 먼저 연다
   page.once('dialog', d => d.accept()); await page.getByRole('button', { name: '삭제' }).click();
-  await expect(page.getByRole('navigation', { name: '원고' }).getByRole('button', { name: /소금빵 후기 2편/ })).toHaveCount(0); // 첫 삭제가 끝난 뒤에
-  await page.getByRole('navigation', { name: '원고' }).getByRole('button', { name: /동네 빵집 소금빵 솔직 후기/ }).click();
+  const mine = page.getByRole('table', { name: '내 글' }); // 지우면 '내 글' 화면(원고 목록을 옮김)
+  await expect(mine.getByRole('button', { name: /소금빵 후기 2편/ })).toHaveCount(0); // 첫 삭제가 끝난 뒤에
+  await expect(page.getByLabel('이번 주 게시')).toContainText(/이번 주 게시 \d+편 · 권장 3~5편/); // 이번 주 게시 수는 '내 글' 위로 옮김
+  await mine.getByRole('button', { name: /동네 빵집 소금빵 솔직 후기/ }).click();
   await expect(page.getByLabel('제목')).toHaveValue('동네 빵집 소금빵 솔직 후기'); // 고른 원고가 다 열린 뒤에 지운다(편집 화면이 바뀌는 중엔 삭제 버튼이 새로 그려짐)
   { const t = page.getByRole('button', { name: '원고 메뉴' }); if (await t.getAttribute('aria-expanded') !== 'true') await t.click(); } // 화면 정리로 메뉴·접기 안에 들어가 먼저 연다
   page.once('dialog', d => d.accept()); await page.getByRole('button', { name: '삭제' }).click();
-  await expect(page.getByRole('navigation', { name: '원고' }).getByRole('button', { name: /동네 빵집 소금빵/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /내 글/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /동네 빵집 소금빵/ })).toHaveCount(0);
 });

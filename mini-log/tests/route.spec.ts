@@ -29,7 +29,7 @@ test('탭·원고가 주소에 남아 새로고침해도 그대로, 뒤로 가�
   page.once('dialog', d => d.accept());
   { const t = page.getByRole('button', { name: '원고 메뉴' }); if (await t.getAttribute('aria-expanded') !== 'true') await t.click(); } // 화면 정리로 메뉴·접기 안에 들어가 먼저 연다
   await page.getByRole('button', { name: '삭제' }).click();
-  await expect(page).toHaveURL(/#drafts$/);
+  await expect(page).toHaveURL(/#mine$/); // 지우면 '내 글'로(원고 목록을 옮김)
 });
 
 test('글을 쓰자마자(0.8초 전에) 새로고침해도 쓴 내용이 남는다', async ({ page }) => {
