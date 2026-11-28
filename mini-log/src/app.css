@@ -1070,3 +1070,6 @@ select.input { appearance: auto; }
 }
 .wiz-foot .btn.primary { min-width: 200px; }
 .wiz-howto .link-btn { text-decoration: none; }
+.type-grip { cursor: grab; touch-action: none; user-select: none; display: inline-grid; place-items: center; width: 28px; min-height: 36px; color: var(--muted); font-size: 1.1rem; border-radius: 8px; }
+.type-grip:hover { background: var(--surface-2); color: var(--text); }
+.type-list > li.dragging { box-shadow: 0 6px 18px rgb(40 30 20 / 0.14); border-color: var(--app); background: var(--app-soft); cursor: grabbing; }

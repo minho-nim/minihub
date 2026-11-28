@@ -37,6 +37,15 @@ test('글 종류 설정 화면: 새 종류 추가·AI 뼈대·맨 위로·숨기
   const n = await rows.count();
   for (let i = 0; i < n - 1; i++) await card.getByRole('button', { name: '전시회 위로' }).click();
   await expect(card.getByText(/버튼 순서: 내가 정한 순/)).toBeVisible();
+  // 끌어서 옮기기: '카페' 손잡이를 맨 아래 줄로 끌면 맨 끝으로 간다
+  const grip = card.getByLabel('카페 끌어서 옮기기');
+  const g = (await grip.boundingBox())!, last = (await rows.last().boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width / 2, last.y + last.height - 4, { steps: 12 });
+  await page.mouse.up();
+  await expect(rows.last()).toContainText('카페');
+  await expect(rows.first()).toContainText('전시회');
   await rows.filter({ hasText: '맛집' }).getByLabel('버튼에 보이기').uncheck();
   await card.getByRole('button', { name: '글 종류 저장' }).click();
   await expect(card.getByText('글 종류를 저장했어요.', { exact: false })).toBeVisible();
