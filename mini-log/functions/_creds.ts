@@ -10,10 +10,15 @@ const te = new TextEncoder(), td = new TextDecoder();
 const toB64 = (u: Uint8Array) => { let s = ''; for (const b of u) s += String.fromCharCode(b); return btoa(s); };
 const fromB64 = (s: string) => { try { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch { return null; } };
 
+// 암호화 키: CRED_KEY가 있으면 그것. 없으면 이미 운영에 있는 서버 비밀값(MAIL_CRON_TOKEN)에서 HKDF로 뽑는다(소유자 결정 2026-11-28:
+// '미노피아처럼 Cloudflare에 따로 넣지 않아도 바로 켜지게'). 그 비밀값을 바꾸면 저장된 연결·알림 키를 다시 만들어야 한다.
 async function key(env: HubEnv): Promise<CryptoKey | null> {
   const raw = typeof env.CRED_KEY === 'string' ? fromB64(env.CRED_KEY.trim()) : null;
-  if (!raw || raw.length !== 32) return null;
-  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  if (raw && raw.length === 32) return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  const seed = typeof env.MAIL_CRON_TOKEN === 'string' ? env.MAIL_CRON_TOKEN.trim() : '';
+  if (seed.length < 16) return null;
+  const base = await crypto.subtle.importKey('raw', te.encode(seed), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: te.encode('minilog-cred-v1'), info: te.encode('creds+vapid') }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 /** 화면에서 연결을 저장할 수 있는지(CRED_KEY가 있는지) */
 export const credReady = async (env: HubEnv) => !!(await key(env));

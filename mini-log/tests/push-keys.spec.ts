@@ -31,4 +31,11 @@ test('알림 키: 비밀값이 없으면 CRED_KEY로 한 번 만들어 비밀 �
   expect(b).toEqual(a); // 같은 키를 다시 씀
   expect(await vapidKeysFor({}, fakeDb().db)).toBeNull();
   expect(await vapidKeysFor({ CRED_KEY: Buffer.alloc(32, 6).toString('base64') }, db)).toBeNull(); // 다른 키로는 안 풀림
+  // CRED_KEY가 없어도 운영에 이미 있는 MAIL_CRON_TOKEN에서 키를 뽑아 바로 켤 수 있다(Cloudflare에 따로 넣지 않아도)
+  const viaCron = { MAIL_CRON_TOKEN: 'cron-token-for-test-0123456789' };
+  const c1 = fakeDb();
+  const k1 = await vapidKeysFor(viaCron, c1.db);
+  expect(k1).not.toBeNull();
+  expect(await vapidKeysFor(viaCron, c1.db)).toEqual(k1);
+  expect(await vapidKeysFor({ MAIL_CRON_TOKEN: 'short' }, fakeDb().db)).toBeNull(); // 너무 짧은 값은 쓰지 않음
 });

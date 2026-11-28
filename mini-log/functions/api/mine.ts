@@ -10,7 +10,7 @@ export const onRequestGet = async (ctx: HubContext) => {
   const [posts, mails, shares] = await Promise.all([
     db.prepare('SELECT url, title, published_on, views FROM minilog_posts WHERE user = ? ORDER BY published_on DESC LIMIT 300').bind(user).all<{ url: string; title: string; published_on: string | null; views: number | null }>(),
     db.prepare("SELECT id, subject, kind, to_addr, from_addr, sent_at, campaign_id FROM minilog_mails WHERE user = ? AND sent_at IS NOT NULL AND (kind = 'outgoing' OR status = 'sent') ORDER BY sent_at DESC LIMIT 200").bind(user).all<{ id: string; subject: string; kind: string; to_addr: string | null; from_addr: string | null; sent_at: number; campaign_id: string | null }>(),
-    db.prepare('SELECT draft_id, channel, shared_at FROM minilog_shares WHERE user = ? ORDER BY shared_at DESC LIMIT 300').bind(user).all<{ draft_id: string; channel: string; shared_at: number }>(),
+    db.prepare('SELECT draft_id, channel, shared_at, text FROM minilog_shares WHERE user = ? ORDER BY shared_at DESC LIMIT 300').bind(user).all<{ draft_id: string; channel: string; shared_at: number; text: string | null }>(),
   ]);
   return json({
     posts: posts.results.filter(p => /^https:\/\//.test(p.url)),

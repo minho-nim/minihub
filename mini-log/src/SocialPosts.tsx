@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { api } from '../../shared/client/api';
 import { composeUrl, THREADS_LIMIT, threadsText, X_LIMIT, xLength, xText } from './publishKit';
 
-export function SocialPosts({ draftId, title, body, hashtags, url, beforeAi, onMessage }: {
+export function SocialPosts({ draftId, title, body, hashtags, url, instagram, beforeAi, onMessage }: {
   draftId: string; title: string; body: string; hashtags: string[]; url: string;
+  /** 인스타 칸의 지금 글('인스타에 올렸어요'를 누를 때 함께 저장) */
+  instagram: string;
   /** AI 요청 전에 원고를 먼저 저장 */
   beforeAi: () => Promise<void>;
   onMessage: (m: { kind: 'info' | 'error'; text: string }) => void;
@@ -25,7 +27,9 @@ export function SocialPosts({ draftId, title, body, hashtags, url, beforeAi, onM
   async function mark(channel: 'instagram' | 'threads' | 'x', on: boolean) {
     const before = shared;
     setShared(cur => { const next = { ...cur }; if (on) next[channel] = Date.now(); else delete next[channel]; return next; }); // 누르면 바로 바뀌고, 못 저장하면 되돌린다
-    try { const r = await api<{ channels: Record<string, number> }>(`/api/drafts/${draftId}/shares`, { method: 'PUT', body: { channel, shared: on } }); setShared(r.channels); }
+    // 올린 글도 함께 저장해 '내 글'에서 다시 본다(열어 둔 칸이 있으면 그 글, 없으면 기본 글)
+    const text = channel === 'threads' ? (threads ?? threadsText(title, body, hashtags, link)) : channel === 'x' ? (x ?? xText(title, body, hashtags, link)) : instagram;
+    try { const r = await api<{ channels: Record<string, number> }>(`/api/drafts/${draftId}/shares`, { method: 'PUT', body: { channel, shared: on, ...(on ? { text } : {}) } }); setShared(r.channels); }
     catch (e) { setShared(before); onMessage({ kind: 'error', text: e instanceof Error ? e.message : '기록하지 못했어요.' }); }
   }
 

@@ -1157,3 +1157,4 @@ body { background: var(--page-bg); }
 .today-side, .today-side > *, .today-list, .today-list li, .brief-hero-wrap > * { min-width: 0; }
 .mine-line, .mine-line section, .mine-line ol, .mine-line li, .mine-row { min-width: 0; }
 .mine-line ol { grid-template-columns: minmax(0, 1fr); }
+.mine-full { color: var(--text); max-height: 50vh; overflow: auto; } .mine-mail { display: grid; gap: 6px; }

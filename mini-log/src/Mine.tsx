@@ -10,13 +10,14 @@ export interface MineDraft { id: string; title: string; body: string; status: 'd
 interface Extra {
   posts: { url: string; title: string; published_on: string | null; views: number | null }[];
   mails: { id: string; subject: string; kind: string; sent_at: number; campaign_id: string | null; to: string }[];
-  shares: { draft_id: string; channel: string; shared_at: number }[];
+  shares: { draft_id: string; channel: string; shared_at: number; text: string | null }[];
 }
 type Kind = 'd' | 'b' | 'm' | 's';
 const KIND: Record<Kind, { label: string; icon: string }> = { d: { label: '원고', icon: 'drafts' }, b: { label: '블로그 글', icon: 'blog' }, m: { label: '보낸 메일·제안', icon: 'mail' }, s: { label: 'SNS 글', icon: 'report' } };
 const CHANNEL: Record<string, string> = { instagram: '인스타그램', threads: '스레드', x: 'X' };
 const STATUS: Record<MineDraft['status'], string> = { draft: '작성 중', approved: '승인됨', published: '게시됨' };
-interface Item { key: string; kind: Kind; title: string; sub: string; status: string; tone: '' | 'ok' | 'pub'; at: number; when: string; extra: string; draftId?: string; url?: string; preview?: string }
+interface Item { key: string; kind: Kind; title: string; sub: string; status: string; tone: '' | 'ok' | 'pub'; at: number; when: string; extra: string; draftId?: string; url?: string; preview?: string; mailId?: string }
+interface MailView { subject: string; snippet: string; reply_body: string; kind: string; from_name: string; from_addr: string; to_addr: string; sent_at: number | null }
 
 const md = (ms: number) => { const d = new Date(ms + 9 * 3600000); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`; };
 const dayMs = (s: string) => Date.parse(`${s}T00:00:00+09:00`);
@@ -30,8 +31,8 @@ function sectionOf(at: number, now: number) {
 }
 const VIEW_KEY = 'minilog.mine.view';
 
-export function MineView({ drafts, onOpenDraft, onCreate, creating, onMail, pickBar, picking, picked, onPick, olderButton, rhythm }: {
-  drafts: MineDraft[] | null; onOpenDraft: (id: string) => void; onCreate: () => void; creating: boolean; onMail: () => void;
+export function MineView({ drafts, onRefresh, onOpenDraft, onCreate, creating, onMail, pickBar, picking, picked, onPick, olderButton, rhythm }: {
+  drafts: MineDraft[] | null; onRefresh: () => void; onOpenDraft: (id: string) => void; onCreate: () => void; creating: boolean; onMail: () => void;
   pickBar: ReactNode; picking: boolean; picked: Set<string>; onPick: (id: string) => void; olderButton: ReactNode; rhythm: ReactNode;
 }) {
   const [extra, setExtra] = useState<Extra | null>(null);
@@ -41,6 +42,8 @@ export function MineView({ drafts, onOpenDraft, onCreate, creating, onMail, pick
   const [sel, setSel] = useState<string | null>(null);
   const types = usePostTypes();
   const setView = (v: 'table' | 'time') => { setViewS(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* 기억 못 해도 됨 */ } };
+  // 열 때마다 원고 목록도 새로(다른 기기에서 만든 원고까지)
+  useEffect(() => { onRefresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api<Extra>('/api/mine').then(setExtra).catch(() => setExtra({ posts: [], mails: [], shares: [] })); }, []);
 
   const now = Date.now();
@@ -58,10 +61,10 @@ export function MineView({ drafts, onOpenDraft, onCreate, creating, onMail, pick
       const at = p.published_on ? dayMs(p.published_on) : 0;
       out.push({ key: `b-${p.url}`, kind: 'b', title: p.title || '(제목 없음)', sub: '블로그', status: '게시 완료', tone: 'pub', at, when: at ? md(at) : '', extra: p.views != null ? `조회 ${p.views.toLocaleString('ko-KR')}` : '', url: p.url });
     }
-    for (const m of extra?.mails ?? []) out.push({ key: `m-${m.id}`, kind: 'm', title: m.subject || '(제목 없음)', sub: m.kind === 'outgoing' ? '새 메일·제안' : '답장', status: '보냄', tone: 'ok', at: m.sent_at, when: md(m.sent_at), extra: m.to ? `받는 사람 ${m.to}` : '' });
+    for (const m of extra?.mails ?? []) out.push({ key: `m-${m.id}`, kind: 'm', title: m.subject || '(제목 없음)', sub: m.kind === 'outgoing' ? '새 메일·제안' : '답장', status: '보냄', tone: 'ok', at: m.sent_at, when: md(m.sent_at), extra: m.to ? `받는 사람 ${m.to}` : '', mailId: m.id });
     for (const s of extra?.shares ?? []) {
       const d = byId.get(s.draft_id);
-      out.push({ key: `s-${s.draft_id}-${s.channel}`, kind: 's', title: `${d?.title.trim() || '원고'} · ${CHANNEL[s.channel] ?? s.channel}`, sub: CHANNEL[s.channel] ?? s.channel, status: '올림', tone: 'ok', at: s.shared_at, when: md(s.shared_at), extra: d ? `← ${d.title.trim() || '원고'}` : '', draftId: s.draft_id });
+      out.push({ key: `s-${s.draft_id}-${s.channel}`, kind: 's', title: `${d?.title.trim() || '원고'} · ${CHANNEL[s.channel] ?? s.channel}`, sub: CHANNEL[s.channel] ?? s.channel, status: '올림', tone: 'ok', at: s.shared_at, when: md(s.shared_at), extra: d ? `← ${d.title.trim() || '원고'}` : '', draftId: s.draft_id, preview: s.text ?? '' });
     }
     return out.sort((a, b) => b.at - a.at);
   }, [drafts, extra, types]);
@@ -71,9 +74,19 @@ export function MineView({ drafts, onOpenDraft, onCreate, creating, onMail, pick
   const shown = items.filter(i => (kind === 'all' || i.kind === kind) && (!needle || `${i.title} ${i.sub} ${i.preview ?? ''}`.toLowerCase().includes(needle)));
   const sections: [string, Item[]][] = [];
   for (const it of shown) { const s = sectionOf(it.at, now); const last = sections[sections.length - 1]; if (last && last[0] === s) last[1].push(it); else sections.push([s, [it]]); }
-  const open = (it: Item) => { if (it.draftId) onOpenDraft(it.draftId); else if (it.kind === 'm') onMail(); };
+  // 메일·SNS 글은 다른 화면으로 가지 않고 이 화면 오른쪽 미리보기에서 본다(원고만 원고 화면으로)
+  const open = (it: Item) => { if (it.kind === 'd' && it.draftId) onOpenDraft(it.draftId); else { setSel(it.key); setView('time'); } };
   const selItem = shown.find(i => i.key === sel) ?? shown[0] ?? null;
   const related = selItem?.draftId ? items.filter(i => i.kind === 's' && i.draftId === selItem.draftId && i.key !== selItem.key) : [];
+  // 보낸 메일은 고르면 그 메일 한 통을 읽어 와 이 화면에서 보여 준다(글자로만, HTML은 넣지 않음)
+  const [mailView, setMailView] = useState<{ id: string; mail: MailView | null; error?: string } | null>(null);
+  useEffect(() => {
+    const id = selItem?.mailId;
+    if (!id || mailView?.id === id) return;
+    setMailView({ id, mail: null });
+    api<{ mail: MailView }>(`/api/mail/${id}`).then(r => setMailView({ id, mail: r.mail })).catch(e => setMailView({ id, mail: null, error: e instanceof Error ? e.message : '메일을 불러오지 못했어요.' }));
+  }, [selItem?.mailId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mv = mailView && selItem?.mailId === mailView.id ? mailView : null;
 
   const TitleCell = ({ it }: { it: Item }) => it.url
     ? <a className="mine-title" href={it.url} target="_blank" rel="noopener noreferrer">{it.title}</a>
@@ -144,9 +157,23 @@ export function MineView({ drafts, onOpenDraft, onCreate, creating, onMail, pick
           {selItem && (
             <aside className="card mine-preview" aria-label="미리보기">
               <div className="row-between"><span className="mine-meta"><Tag k={selItem.kind} /><span className={`mine-st${selItem.tone ? ` ${selItem.tone}` : ''}`}>{selItem.status}</span><span className="muted small">{selItem.sub} · {selItem.when}</span></span>
-                {selItem.url ? <a className="btn small" href={selItem.url} target="_blank" rel="noopener noreferrer">블로그에서 보기 ↗</a> : <button type="button" className="btn small" onClick={() => open(selItem)}>열기</button>}</div>
+                {selItem.url ? <a className="btn small" href={selItem.url} target="_blank" rel="noopener noreferrer">블로그에서 보기 ↗</a>
+                  : selItem.kind === 'm' ? <button type="button" className="btn small" onClick={onMail}>메일함에서 열기</button>
+                  : selItem.draftId ? <button type="button" className="btn small" onClick={() => onOpenDraft(selItem.draftId!)}>{selItem.kind === 's' ? '원고 열기' : '열기'}</button> : null}</div>
               <h2>{selItem.title}</h2>
-              {selItem.preview ? <p className="mine-text">{selItem.preview}{selItem.preview.length >= 220 ? '…' : ''}</p> : selItem.extra && <p className="muted small" style={{ margin: 0 }}>{selItem.extra}</p>}
+              {selItem.kind === 's' && (selItem.preview ? <p className="mine-text mine-full">{selItem.preview}</p> : <p className="muted small" style={{ margin: 0 }}>이 기록은 글을 저장하기 전에 체크한 거라 본문이 없어요. 앞으로 '올렸어요'를 누르면 그때 글이 함께 저장돼요.</p>)}
+              {selItem.kind === 'd' && (selItem.preview ? <p className="mine-text">{selItem.preview}{selItem.preview.length >= 220 ? '…' : ''}</p> : <p className="muted small" style={{ margin: 0 }}>아직 본문이 없어요.</p>)}
+              {selItem.kind === 'b' && selItem.extra && <p className="muted small" style={{ margin: 0 }}>{selItem.extra}</p>}
+              {selItem.kind === 'm' && (!mv || (!mv.mail && !mv.error) ? <p className="muted small" role="status" style={{ margin: 0 }}>메일을 불러오는 중…</p>
+                : mv.error ? <p className="error small" role="alert" style={{ margin: 0 }}>{mv.error}</p>
+                : mv.mail && (
+                  <div className="mine-mail">
+                    <p className="muted small" style={{ margin: 0 }}>{selItem.extra}</p>
+                    <b className="small">내가 보낸 글</b>
+                    <p className="mine-text mine-full">{mv.mail.reply_body || '(본문 없음)'}</p>
+                    {mv.mail.kind !== 'outgoing' && mv.mail.snippet && <><b className="small">받은 메일({mv.mail.from_name || mv.mail.from_addr})</b><p className="mine-text">{mv.mail.snippet}</p></>}
+                  </div>
+                ))}
               {selItem.kind === 'd' && (
                 <div className="mine-rel"><b className="small">이 원고에서 나온 것</b>
                   {related.length ? related.map(r => <div key={r.key} className="small mine-meta"><Tag k={r.kind} />{r.sub} <span className="muted">{r.when}</span></div>) : <span className="muted small">아직 없어요(SNS에 올렸다고 표시하면 여기 모여요).</span>}

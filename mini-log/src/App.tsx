@@ -408,7 +408,7 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
         : view === 'structure' ? <StructureView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'blog' ? <BlogView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'calendar' ? <CalendarView drafts={drafts ?? []} onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onCreate={date => { void create(date); }} onSaved={list => list.forEach(onSaved)} />
-        : view === 'mine' ? <MineView drafts={drafts} creating={creating} onCreate={() => { void create(); }} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onMail={() => setView('mail')}
+        : view === 'mine' ? <MineView drafts={drafts} onRefresh={() => { void refresh(); }} creating={creating} onCreate={() => { void create(); }} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onMail={() => setView('mail')}
             pickBar={pickBar} picking={picking} picked={picked} onPick={id => setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; })} olderButton={olderButton}
             rhythm={drafts && drafts.length > 0 ? <WeekRhythm drafts={drafts} /> : null} />
         : view === 'settings' ? <SettingsView name={me.name} onRenamed={onRenamed} onBack={() => setView('drafts')} />
@@ -1507,7 +1507,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
               </li>
               <li className="kit-wide">
                 <span className="kit-label">스레드·X</span>
-                <SocialPosts draftId={draft.id} title={fields.title} body={fields.body} hashtags={fields.hashtags} url={publishUrl} beforeAi={flush} onMessage={setMessage} />
+                <SocialPosts draftId={draft.id} title={fields.title} body={fields.body} hashtags={fields.hashtags} url={publishUrl} instagram={insta ?? instagramText(fields.title, fields.body, fields.hashtags)} beforeAi={flush} onMessage={setMessage} />
               </li>
               </>)}
             </ol>
