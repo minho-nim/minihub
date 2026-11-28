@@ -10,26 +10,34 @@ const te = new TextEncoder(), td = new TextDecoder();
 const toB64 = (u: Uint8Array) => { let s = ''; for (const b of u) s += String.fromCharCode(b); return btoa(s); };
 const fromB64 = (s: string) => { try { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch { return null; } };
 
+// 암호화 키: CRED_KEY가 있으면 그것. 없으면 이미 운영에 있는 서버 비밀값(MAIL_CRON_TOKEN)에서 HKDF로 뽑는다(소유자 결정 2026-11-28:
+// '미노피아처럼 Cloudflare에 따로 넣지 않아도 바로 켜지게'). 그 비밀값을 바꾸면 저장된 연결·알림 키를 다시 만들어야 한다.
 async function key(env: HubEnv): Promise<CryptoKey | null> {
   const raw = typeof env.CRED_KEY === 'string' ? fromB64(env.CRED_KEY.trim()) : null;
-  if (!raw || raw.length !== 32) return null;
-  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  if (raw && raw.length === 32) return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  const seed = typeof env.MAIL_CRON_TOKEN === 'string' ? env.MAIL_CRON_TOKEN.trim() : '';
+  if (seed.length < 16) return null;
+  const base = await crypto.subtle.importKey('raw', te.encode(seed), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: te.encode('minilog-cred-v1'), info: te.encode('creds+vapid') }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 /** 화면에서 연결을 저장할 수 있는지(CRED_KEY가 있는지) */
 export const credReady = async (env: HubEnv) => !!(await key(env));
 
-export async function seal(env: HubEnv, user: UserName, provider: Provider, text: string): Promise<string | null> {
+export const seal = (env: HubEnv, user: UserName, provider: Provider, text: string) => sealWith(env, `${user}:${provider}`, text);
+export const unseal = (env: HubEnv, user: UserName, provider: Provider, sealed: string) => unsealWith(env, `${user}:${provider}`, sealed);
+/** aad: 이 암호문이 어디 것인지(다른 자리로 옮기면 풀리지 않게) */
+export async function sealWith(env: HubEnv, aad: string, text: string): Promise<string | null> {
   const k = await key(env); if (!k) return null;
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: te.encode(`${user}:${provider}`) }, k, te.encode(text)));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: te.encode(aad) }, k, te.encode(text)));
   return `v1.${toB64(iv)}.${toB64(ct)}`;
 }
-export async function unseal(env: HubEnv, user: UserName, provider: Provider, sealed: string): Promise<string | null> {
+export async function unsealWith(env: HubEnv, aad: string, sealed: string): Promise<string | null> {
   const k = await key(env); if (!k) return null;
   const [v, ivs, cts] = sealed.split('.');
   const iv = fromB64(ivs ?? ''), ct = fromB64(cts ?? '');
   if (v !== 'v1' || !iv || !ct) return null;
-  try { return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: te.encode(`${user}:${provider}`) }, k, ct)); } catch { return null; }
+  try { return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: te.encode(aad) }, k, ct)); } catch { return null; }
 }
 
 /** 화면에서 연결한 계정(풀리는 것만) */

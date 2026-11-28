@@ -1,7 +1,8 @@
 // 아침 브리핑: 오늘 할 일(협찬 마감·신청 마감·답장할 메일·단계 확인·오늘 올릴 원고)을 급한 순으로 고르고,
 // 휴대폰 알림(웹 푸시)으로 아침에 한 번 알린다. AI를 쓰지 않는다(규칙만).
 // 알림에는 내용을 싣지 않는다(빈 푸시). 휴대폰의 서비스 워커가 로그인된 상태로 /api/brief를 읽어 제목만 보여 준다.
-// VAPID 키는 Cloudflare 비밀값 VAPID_PUBLIC_KEY·VAPID_PRIVATE_KEY에만 둔다(설정 화면에서 기기 안에서 만들어 복사).
+// VAPID 키: Cloudflare 비밀값 VAPID_PUBLIC_KEY·VAPID_PRIVATE_KEY가 있으면 그것, 없으면 앱이 만들어 CRED_KEY로 암호화해 둔다(vapidKeysFor).
+import { credReady, sealWith, unsealWith } from './_creds';
 import type { D1Database, HubEnv } from '../../shared/server/d1';
 import type { UserName } from '../../shared/server/auth';
 import { todayExternal } from './_extCal';
@@ -85,6 +86,26 @@ export function cleanSubscription(v: unknown, env: HubEnv): { endpoint: string; 
 const b64url = (bytes: Uint8Array) => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const fromB64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
 
+/** 아침 알림 키: Cloudflare 비밀값 VAPID_*가 있으면 그것, 없으면 앱이 처음 한 번 만들어 비밀 키만 CRED_KEY로 암호화해 D1에 둔다.
+ *  그래서 관리자는 CRED_KEY 하나만 넣으면 되고, 사용자는 설정에서 켜기/끄기만 한다. CRED_KEY도 없으면 null */
+export async function vapidKeysFor(env: HubEnv, db: D1Database): Promise<{ pub: string; priv: string } | null> {
+  const fixed = vapidKeys(env);
+  if (fixed) return fixed;
+  if (!(await credReady(env))) return null;
+  const row = await db.prepare("SELECT pub, secret FROM minilog_keys WHERE name = 'vapid'").first<{ pub: string; secret: string }>();
+  if (row) { const priv = await unsealWith(env, 'app:vapid', row.secret); return priv ? { pub: row.pub, priv } : null; }
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']) as CryptoKeyPair;
+  const pub = b64url(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey) as ArrayBuffer));
+  const priv = (await crypto.subtle.exportKey('jwk', pair.privateKey) as JsonWebKey).d ?? '';
+  const secret = await sealWith(env, 'app:vapid', priv);
+  if (!secret || !priv) return null;
+  // 두 요청이 동시에 만들면 먼저 넣은 것만 남기고 그것을 다시 읽는다
+  await db.prepare("INSERT OR IGNORE INTO minilog_keys (name, pub, secret, created_at) VALUES ('vapid', ?, ?, ?)").bind(pub, secret, Date.now()).run();
+  const saved = await db.prepare("SELECT pub, secret FROM minilog_keys WHERE name = 'vapid'").first<{ pub: string; secret: string }>();
+  const p2 = saved ? await unsealWith(env, 'app:vapid', saved.secret) : null;
+  return saved && p2 ? { pub: saved.pub, priv: p2 } : null;
+}
+
 export function vapidKeys(env: HubEnv): { pub: string; priv: string } | null {
   const pub = typeof env.VAPID_PUBLIC_KEY === 'string' ? env.VAPID_PUBLIC_KEY.trim() : '';
   const priv = typeof env.VAPID_PRIVATE_KEY === 'string' ? env.VAPID_PRIVATE_KEY.trim() : '';
@@ -114,7 +135,7 @@ export async function sendPush(endpoint: string, keys: { pub: string; priv: stri
 
 /** 아침 알림 보내기(예약 작업): 할 일이 있는 사람에게만, 하루 한 번(같은 날 다시 불러도 겹치지 않음) */
 export async function morningPush(db: D1Database, env: HubEnv, users: readonly UserName[], now = Date.now()) {
-  const keys = vapidKeys(env);
+  const keys = await vapidKeysFor(env, db);
   if (!keys) return { skipped: 'no_keys' as const };
   const today = kstToday(now);
   const result: Record<string, { sent: number; gone: number; failed: number; items: number }> = {};

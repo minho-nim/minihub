@@ -20,7 +20,10 @@ test('두 기기에서 같은 원고를 고치면 나중 기기는 덮어쓰지 
   await phone.getByLabel('본문').fill('휴대폰에서 쓴 본문');
   await expect(phone.getByRole('alert')).toContainText('다른 기기에서 먼저 고친 원고예요');
   await expect(phone.getByLabel('본문')).toHaveValue('PC에서 쓴 본문 이어서'); // 최신 내용으로
-  await expect(phone.getByRole('button', { name: /동시 수정 원고 · 다른 기기 수정 사본/ })).toBeVisible();
+  await phone.goto('/#mine'); // 원고 목록은 '내 글' 화면으로 옮김
+  await expect(phone.getByRole('table', { name: '내 글' }).getByRole('button', { name: /동시 수정 원고 · 다른 기기 수정 사본/ })).toBeVisible();
+  await phone.goBack(); // 보던 원고로 돌아가 이어서 고친다
+  await expect(phone.getByLabel('본문')).toBeVisible();
 
   const drafts = await pc.evaluate(async () => (await (await fetch('/api/drafts')).json()).drafts as { id: string; title: string; body: string }[]);
   expect(drafts.find(d => d.id === id)!.body).toBe('PC에서 쓴 본문 이어서');

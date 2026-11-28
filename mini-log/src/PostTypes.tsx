@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../shared/client/api';
 import { POST_TYPES, type PostType } from '../functions/_postTypes';
 
@@ -47,6 +47,8 @@ export function PostTypesCard() {
   const [dirty, setDirty] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [raw, setRaw] = useState<Record<string, string>>({});
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const olRef = useRef<HTMLOListElement>(null);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
@@ -60,6 +62,31 @@ export function PostTypesCard() {
     const j = i + d; if (j < 0 || j >= list.length) return;
     const next = [...list]; [next[i], next[j]] = [next[j], next[i]];
     setList(next); setManual(true); setDirty(true);
+  };
+  // 끌어서 옮기기: 손잡이를 누른 채 위아래로 움직이면 지나가는 줄 가운데를 기준으로 자리를 바꾼다(마우스·손가락 같이)
+  const dragStart = (e: React.PointerEvent, key: string) => {
+    e.preventDefault();
+    setDragKey(key);
+    const onMove = (ev: PointerEvent) => {
+      let moved = false;
+      const items = [...(olRef.current?.children ?? [])] as HTMLElement[];
+      const to = items.findIndex(el => { const b = el.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+      setList(l => {
+        if (!l) return l;
+        const from = l.findIndex(t => t.key === key);
+        let at = to < 0 ? l.length - 1 : to > from ? to - 1 : to;
+        at = Math.max(0, Math.min(l.length - 1, at));
+        if (at === from) return l;
+        const next = [...l]; const [it] = next.splice(from, 1); next.splice(at, 0, it);
+        moved = true;
+        return next;
+      });
+      if (moved) { setManual(true); setDirty(true); }
+    };
+    const onUp = () => { setDragKey(null); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
   const add = () => {
     const label = newName.trim().slice(0, 20); if (!label) return;
@@ -97,13 +124,14 @@ export function PostTypesCard() {
     <section className="card step" aria-labelledby="types-title">
       <h2 id="types-title" className="step-title">글 종류</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        원고 화면 버튼 순서: <b>{manual ? '내가 정한 순' : '자주 쓴 순'}</b>. 화살표로 옮기면 내가 정한 순이 돼요.
+        원고 화면 버튼 순서: <b>{manual ? '내가 정한 순' : '자주 쓴 순'}</b>. 줄 왼쪽 ⠿를 끌거나 화살표로 옮기면 내가 정한 순이 돼요.
         {manual && <> <button type="button" className="link-btn small" onClick={() => { setManual(false); setDirty(true); }}>자주 쓴 순으로 돌리기</button></>}
       </p>
-      <ol className="type-list" aria-label="글 종류 목록">
+      <ol className="type-list" aria-label="글 종류 목록" ref={olRef}>
         {list.map((t, i) => (
-          <li key={t.key} className={t.hidden ? 'off' : ''}>
+          <li key={t.key} className={`${t.hidden ? 'off' : ''}${dragKey === t.key ? ' dragging' : ''}`}>
             <div className="type-row">
+              <span className="type-grip" role="button" tabIndex={-1} aria-label={`${t.label} 끌어서 옮기기`} title="끌어서 순서 바꾸기" onPointerDown={e => dragStart(e, t.key)}>⠿</span>
               <span className="type-move">
                 <button type="button" className="btn ghost icon" aria-label={`${t.label} 위로`} disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
                 <button type="button" className="btn ghost icon" aria-label={`${t.label} 아래로`} disabled={i === list.length - 1} onClick={() => move(i, 1)}>↓</button>

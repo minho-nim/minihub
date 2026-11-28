@@ -22,8 +22,10 @@ test('사진 여러 장을 올리고, AI가 사진과 함께 초안을 쓰고, �
   await expect(page.getByLabel('제목')).toHaveValue('가짜 Gemini가 쓴 제목(사진 2장)');
   await expect(page.getByLabel('본문')).toHaveValue(/\[사진 1\]\n\[사진 2\]/);
   await page.reload();
-  await expect(page.getByRole('button', { name: /사진 2 ·/ })).toBeVisible(); // 목록에 사진 수
-  await page.getByRole('button', { name: /가짜 Gemini가 쓴 제목/ }).first().click() /* 새로고침해도 원고가 열려 있어 목록 쪽(첫째)을 누름 */;
+  await page.goto('/#mine'); // 원고 목록은 '내 글' 화면으로 옮김
+  const row = page.getByRole('table', { name: '내 글' }).getByRole('row').filter({ hasText: '가짜 Gemini가 쓴 제목(사진 2장)' });
+  await expect(row).toContainText('사진 2'); // 목록에 사진 수
+  await row.getByRole('button', { name: /가짜 Gemini가 쓴 제목/ }).click();
   await expect(page.getByRole('img', { name: /^사진 2:/ })).toBeVisible();
   // 순서 바꾸기: 사진 2(소금빵)를 앞으로 → 본문 번호도 맞춰짐, 새로고침해도 유지
   await page.getByRole('button', { name: '사진 2 앞으로' }).click();
@@ -56,7 +58,8 @@ test('게시 주소를 넣으면 게시 완료, 사진 삭제 예정이 보이�
   await expect(page.locator('.badge')).toHaveText('게시됨');
   await expect(page.getByText(/게시 후 30일이 지나면 사진이 지워져요/)).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: /게시됨/ }).first().click();
+  await page.goto('/#mine'); // 원고 목록은 '내 글' 화면으로 옮김
+  await page.getByRole('table', { name: '내 글' }).getByRole('row').filter({ hasText: '게시됨' }).getByRole('button').first().click();
   await expect(page.getByRole('link', { name: 'https://blog.naver.com/test/123' })).toBeVisible();
   await page.getByRole('button', { name: '게시 취소' }).click();
   await expect(page.locator('.badge')).toHaveText('승인됨');

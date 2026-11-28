@@ -33,7 +33,8 @@ const GUIDES: Record<Provider, Guide> = {
 };
 const STEP_NAMES = ['고르기', '따라하기', '붙여 넣기', '연결 시험'];
 
-export function ConnectCard() {
+/** inMail: 메일 화면(아직 연결 안 됨)에서 쓸 때 제목·설명을 메일용으로, 연결되면 onConnected로 메일함을 다시 읽는다 */
+export function ConnectCard({ inMail = false, onConnected }: { inMail?: boolean; onConnected?: () => void } = {}) {
   const [state, setState] = useState<State | null>(null);
   const [open, setOpen] = useState<Provider | null>(null);
   const [msg, setMsg] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
@@ -46,7 +47,8 @@ export function ConnectCard() {
   }
   return (
     <section className="card step" aria-labelledby="connect-title">
-      <h2 id="connect-title" className="step-title">메일·캘린더 연결</h2>
+      <h2 id="connect-title" className="step-title">{inMail ? '메일 연결하기(네이버·Gmail)' : '메일·캘린더 연결'}</h2>
+      {inMail && <ol className="small connect-how" style={{ margin: 0, paddingLeft: 20 }}><li>아래에서 네이버나 Gmail의 <b>연결하기</b>를 눌러요.</li><li>창에 나오는 그림대로 <b>앱 비밀번호</b>를 만들어요(로그인 비밀번호 아님, 2~3분).</li><li>아이디와 앱 비밀번호를 붙여 넣고 <b>연결 시험하고 저장</b>을 누르면 끝이에요. 그 뒤로 15분마다 메일이 모여요.</li></ol>}
       <p className="muted small" style={{ margin: 0 }}>앱 비밀번호로 연결해요. 로그인 비밀번호가 아니고, 미니로그 전용으로 따로 만드는 비밀번호예요. 저장할 때 암호화하고 다시 보여 주지 않아요.</p>
       {state && (
         <ul className="connect-list" aria-label="연결 상태">
@@ -65,7 +67,7 @@ export function ConnectCard() {
       )}
       {state && !state.can_save && <KeyMaker />}
       {msg && <p className={msg.kind === 'error' ? 'error small' : 'muted small'} role={msg.kind === 'error' ? 'alert' : 'status'} style={{ margin: 0 }}>{msg.text}</p>}
-      {open && state && <ConnectWizard start={open} canSave={state.can_save} onClose={() => setOpen(null)} onDone={s => { setState(s); setMsg({ kind: 'info', text: '연결했어요. 메일 화면에서 바로 받아 볼 수 있어요.' }); }} />}
+      {open && state && <ConnectWizard start={open} canSave={state.can_save} onClose={() => setOpen(null)} onDone={s => { setState(s); setMsg({ kind: 'info', text: '연결했어요. 메일 화면에서 바로 받아 볼 수 있어요.' }); onConnected?.(); }} />}
     </section>
   );
 }

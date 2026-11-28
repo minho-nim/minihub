@@ -6,6 +6,7 @@ import { MailEditor } from './MailEditor';
 import { showUndo } from './UndoToast';
 import { mailInSource, SourceSwitch, useSource } from './source';
 import { DealCard, DealStrip } from './DealCard';
+import { ConnectCard } from './Connect';
 import type { Campaign } from './Campaigns';
 import { docFromText, docToHtml, docToText, type MailDoc } from '../functions/_mailDoc';
 
@@ -166,17 +167,8 @@ export function MailView({ onBack, onCampaigns, onWaiting, seed = null, onSeedUs
         )}
       </div>
       {message && <p className={message.kind === 'error' ? 'error' : 'muted small'} role={message.kind === 'error' ? 'alert' : 'status'} style={{ margin: 0 }}>{message.text}</p>}
-      {data && !data.connected && (
-        <section className="card step" aria-labelledby="mail-conn">
-          <h2 id="mail-conn" className="step-title">메일 연결(네이버·Gmail)</h2>
-          <p className="small" style={{ margin: 0 }}>연결하면 15분마다 새 메일을 받아 한 메일함에 모으고, 협찬 관련 메일을 골라 답장 초안을 써 둬요. 둘 다 연결해도 돼요.</p>
-          <ol className="small" style={{ margin: 0, paddingLeft: 20 }}>
-            <li>네이버: 메일 → 환경설정 → POP3/IMAP 설정에서 IMAP을 켜고, 2단계 인증 뒤 애플리케이션 비밀번호를 만들어요.</li>
-            <li>Gmail: 구글 계정 2단계 인증을 켜고 보안 → 앱 비밀번호를 만들어요(진짜 비밀번호는 쓰지 않아요).</li>
-            <li>관리자가 Cloudflare 비밀값(NAVER_MAIL_·GMAIL_MAIL_)에 넣어요. 채팅에는 붙여 넣지 마세요.</li>
-          </ol>
-        </section>
-      )}
+      {/* 아직 연결 안 됨: 관리자 비밀값 대신 여기서 바로 연결(그림 따라하기·붙여 넣기·연결 시험) */}
+      {data && !data.connected && <ConnectCard inMail onConnected={() => { api<MailData>('/api/mail').then(apply).catch(e => fail(e, '메일을 불러오지 못했어요.')); }} />}
       {data?.error && <p className="error small" role="alert" style={{ margin: 0 }}>{data.error}</p>}
 
       <SourceSwitch note={source === 'naver' ? '네이버 메일만 보여요' : 'Gmail만 보여요'} />
