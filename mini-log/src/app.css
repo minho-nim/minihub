@@ -1153,3 +1153,7 @@ body { background: var(--page-bg); }
 .ed-wiz-foot .btn.primary { min-width: 220px; background: var(--app); border-color: var(--app); color: #fff; }
 @media (max-width: 839px) { .ed-wiz-foot { bottom: calc(76px + env(safe-area-inset-bottom)); } .ed-wiz-foot .btn.primary { min-width: 0; flex: 1; } }
 .m-tab-badge::after { content: attr(data-n); }
+/* 긴 제목이 칸을 밀어내지 않게(그리드 칸은 기본 최소 폭이 내용 폭이라 0으로) */
+.today-side, .today-side > *, .today-list, .today-list li, .brief-hero-wrap > * { min-width: 0; }
+.mine-line, .mine-line section, .mine-line ol, .mine-line li, .mine-row { min-width: 0; }
+.mine-line ol { grid-template-columns: minmax(0, 1fr); }
