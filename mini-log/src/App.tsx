@@ -175,7 +175,14 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
   useEffect(() => { if (window.location.search) window.history.replaceState(null, '', window.location.pathname + window.location.hash); }, []);
   // 지금 탭·원고를 주소(#ideas, #draft/아이디)에 남긴다: 새로고침해도 그대로, 휴대폰 뒤로 가기는 이전 화면으로
   const firstRoute = useRef(true);
+  const bootHash = useRef(window.location.hash);
   useEffect(() => {
+    // 화면이 막 뜨는 사이에 주소가 바뀌었으면(뒤로 가기 듣기 전) 덮어쓰지 않고 그 주소로 맞춘다
+    if (firstRoute.current && window.location.hash !== bootHash.current) {
+      firstRoute.current = false;
+      const route = readRoute(); setView(route.view); setSelectedId(route.draftId);
+      return;
+    }
     const hash = routeHash(view, selectedId);
     if (window.location.hash !== hash) window.history[firstRoute.current ? 'replaceState' : 'pushState'](null, '', hash);
     firstRoute.current = false;
@@ -212,7 +219,10 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
   // 협찬 화면에서 만든 메일 초안을 메일 화면 '새 메일'로 넘긴다
   const [mailSeed, setMailSeed] = useState<ComposeSeed | null>(null);
 
+  // '내 글'을 열 때 원고 목록을 다시 읽되, 방금 읽었으면(30초 안) 건너뛴다(지운 직후 되돌리기 안내가 휴지통 정리에 밀리지 않게)
+  const lastRefresh = useRef(0);
   const refresh = useCallback(async () => {
+    lastRefresh.current = Date.now();
     try { const data = await api<{ drafts: Draft[]; more?: boolean; next_before?: string | null }>('/api/drafts'); setDrafts(data.drafts); setOlderCursor(data.more ? data.next_before ?? null : null); setListError(''); }
     catch (error) {
       if (error instanceof ApiError && error.status === 401) onLogout();
@@ -408,7 +418,7 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
         : view === 'structure' ? <StructureView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'blog' ? <BlogView onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} />
         : view === 'calendar' ? <CalendarView drafts={drafts ?? []} onBack={() => setView('drafts')} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onCreate={date => { void create(date); }} onSaved={list => list.forEach(onSaved)} />
-        : view === 'mine' ? <MineView drafts={drafts} onRefresh={() => { void refresh(); }} creating={creating} onCreate={() => { void create(); }} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onMail={() => setView('mail')}
+        : view === 'mine' ? <MineView drafts={drafts} onRefresh={() => { if (Date.now() - lastRefresh.current > 30000) void refresh(); }} creating={creating} onCreate={() => { void create(); }} onOpenDraft={id => { setSelectedId(id); setView('drafts'); }} onMail={() => setView('mail')}
             pickBar={pickBar} picking={picking} picked={picked} onPick={id => setPicked(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; })} olderButton={olderButton}
             rhythm={drafts && drafts.length > 0 ? <WeekRhythm drafts={drafts} /> : null} />
         : view === 'settings' ? <SettingsView name={me.name} onRenamed={onRenamed} onBack={() => setView('drafts')} />

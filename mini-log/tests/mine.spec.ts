@@ -14,6 +14,7 @@ test("'내 글': SNS에 올린 글 본문과 보낸 메일을 이 화면에서 �
     return { id: d.id, bad, mailId: sent.mail?.id as string | undefined };
   }, docFromText('안녕하세요, 체험 제안드려요.\n일정 알려 주세요.'));
   expect(made.bad).toBe(200);
+  await page.reload(); // 화면 밖(API)으로 만든 원고를 목록에 다시 읽힌다
   await page.goto('/#mine');
   const table = page.getByRole('table', { name: '내 글' });
   // SNS 글: 표에서 누르면 다른 화면으로 가지 않고 날짜별 미리보기에 본문
