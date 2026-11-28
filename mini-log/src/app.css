@@ -1158,3 +1158,30 @@ body { background: var(--page-bg); }
 .mine-line, .mine-line section, .mine-line ol, .mine-line li, .mine-row { min-width: 0; }
 .mine-line ol { grid-template-columns: minmax(0, 1fr); }
 .mine-full { color: var(--text); max-height: 50vh; overflow: auto; } .mine-mail { display: grid; gap: 6px; }
+/* '다음 할 일' 알림: 되돌리기 알림보다 조금 위, 밝은 바탕에 주황 테두리 */
+.next-toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 59; display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 10px 10px 14px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1.5px solid var(--app); box-shadow: 0 8px 24px rgb(43 34 51 / 0.18); font-size: 0.92rem; animation: next-in 0.18s ease-out; }
+.next-toast > span:not(.next-dot) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.next-dot { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ok); color: #fff; font-weight: 800; flex: none; }
+.next-go { border: 0; border-radius: 10px; background: var(--app); color: #fff; font: inherit; font-weight: 700; padding: 8px 12px; min-height: 40px; cursor: pointer; white-space: nowrap; }
+@keyframes next-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .next-toast { animation: none; } }
+@media (max-width: 839px) { .next-toast { bottom: calc(132px + env(safe-area-inset-bottom, 0px)); } }
+/* 시작하기 체크리스트 */
+.first-check { display: grid; gap: 8px; border-color: color-mix(in srgb, var(--app) 40%, var(--card-line)); }
+.fc-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.fc-bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width 0.3s ease; }
+.fc-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px; }
+.fc-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.fc-list li.done { opacity: 0.65; }
+.fc-n { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); font-weight: 800; font-size: 0.8rem; }
+.fc-list li.done .fc-n { background: var(--ok); color: #fff; }
+.fc-t { flex: 1; min-width: 0; font-size: 0.9rem; }
+.fc-list .btn { min-height: 40px; }
+/* 협찬 카드 D-day를 작은 알약으로(레뷰 카드처럼 눈에 띄게) */
+.board-card .dday { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 99px; background: var(--app-soft); font-size: 0.75rem; }
+.board-card .dday.late { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
+/* 휴대폰: 누르는 칸은 44px 이상 */
+@media (max-width: 839px) {
+  .btn, .chip-btn, .link-btn, .seg button, .mine-title, .side-settings, .m-chips button { min-height: 44px; }
+  .type-move .btn.icon, .type-grip { min-height: 44px; min-width: 44px; }
+}
