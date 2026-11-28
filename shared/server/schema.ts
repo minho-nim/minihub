@@ -89,6 +89,8 @@ const TABLES = [
   // 네이버 캘린더 겹쳐 보기: 켜기 여부와 숨긴 캘린더 주소 목록만(계정은 Cloudflare 비밀값, 일정은 저장하지 않음)
   'CREATE TABLE IF NOT EXISTS minilog_ncal (user TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, hidden TEXT, updated_at INTEGER NOT NULL)',
   // 화면에서 직접 연결한 메일·캘린더 계정: 로그인 주소와, CRED_KEY(Cloudflare 비밀값)로 암호화한 앱 비밀번호만. 원문·키는 DB에 두지 않는다
+  // 앱 공용 키(지금은 아침 알림 VAPID): 공개 키는 그대로, 비밀 키는 CRED_KEY로 암호화해서만
+  'CREATE TABLE IF NOT EXISTS minilog_keys (name TEXT PRIMARY KEY, pub TEXT NOT NULL, secret TEXT NOT NULL, created_at INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS minilog_creds (user TEXT NOT NULL, provider TEXT NOT NULL, login TEXT NOT NULL, secret TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user, provider))',
   'CREATE TABLE IF NOT EXISTS minilog_mail_cursor (user TEXT NOT NULL, account TEXT NOT NULL, uid_validity INTEGER NOT NULL DEFAULT 0, last_uid INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user, account))',
 ];

@@ -18,18 +18,21 @@ async function key(env: HubEnv): Promise<CryptoKey | null> {
 /** 화면에서 연결을 저장할 수 있는지(CRED_KEY가 있는지) */
 export const credReady = async (env: HubEnv) => !!(await key(env));
 
-export async function seal(env: HubEnv, user: UserName, provider: Provider, text: string): Promise<string | null> {
+export const seal = (env: HubEnv, user: UserName, provider: Provider, text: string) => sealWith(env, `${user}:${provider}`, text);
+export const unseal = (env: HubEnv, user: UserName, provider: Provider, sealed: string) => unsealWith(env, `${user}:${provider}`, sealed);
+/** aad: 이 암호문이 어디 것인지(다른 자리로 옮기면 풀리지 않게) */
+export async function sealWith(env: HubEnv, aad: string, text: string): Promise<string | null> {
   const k = await key(env); if (!k) return null;
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: te.encode(`${user}:${provider}`) }, k, te.encode(text)));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: te.encode(aad) }, k, te.encode(text)));
   return `v1.${toB64(iv)}.${toB64(ct)}`;
 }
-export async function unseal(env: HubEnv, user: UserName, provider: Provider, sealed: string): Promise<string | null> {
+export async function unsealWith(env: HubEnv, aad: string, sealed: string): Promise<string | null> {
   const k = await key(env); if (!k) return null;
   const [v, ivs, cts] = sealed.split('.');
   const iv = fromB64(ivs ?? ''), ct = fromB64(cts ?? '');
   if (v !== 'v1' || !iv || !ct) return null;
-  try { return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: te.encode(`${user}:${provider}`) }, k, ct)); } catch { return null; }
+  try { return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: te.encode(aad) }, k, ct)); } catch { return null; }
 }
 
 /** 화면에서 연결한 계정(풀리는 것만) */

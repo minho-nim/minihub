@@ -131,6 +131,7 @@ const b64ToBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').repl
 const bytesToB64 = (b: Uint8Array) => { let s = ''; for (const x of b) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 
 /** 설정: 이 기기에서 아침 알림 켜기/끄기. 키가 아직 없으면 관리자용 키 만들기(이 기기 안에서만 만들고 서버로 보내지 않음) */
+const SHOW_VAPID_MAKER = false;
 export function PushCard() {
   const [info, setInfo] = useState<{ public_key: string | null; devices: number } | null>(null);
   const [on, setOn] = useState<boolean | null>(null);
@@ -185,7 +186,9 @@ export function PushCard() {
       </div>
       <p className="small" style={{ margin: 0 }}>매일 아침 8시 30분쯤, 할 일(마감·답장·오늘 올릴 원고·오늘 일정)이 있으면 이 기기로 한 번 알려요. 알림에는 할 일 제목만 보이고 메일 내용·금액은 넣지 않아요.{info ? ` 알림 켠 기기 ${info.devices}대.` : ''}</p>
       {!supported && <p className="muted small" style={{ margin: 0 }}>이 브라우저는 알림을 받을 수 없어요. 아이폰은 사파리에서 '홈 화면에 추가'로 미니로그를 설치한 뒤 그 앱에서 켜 주세요.</p>}
-      {supported && info && !info.public_key && (
+      {/* 알림 키는 이제 서버가 CRED_KEY 하나로 스스로 만든다. 예전 '알림 키 만들기(관리자)'는 코드만 남기고 화면에서 뺌(SHOW_VAPID_MAKER) */}
+      {supported && info && !info.public_key && <p className="muted small" style={{ margin: 0 }}>아직 켤 수 없어요. 관리자가 암호화 키(CRED_KEY) 하나를 Cloudflare에 넣으면 바로 켤 수 있어요. 키는 위 '메일·캘린더 연결'의 '관리자용'에서 만들어요.</p>}
+      {SHOW_VAPID_MAKER && supported && info && !info.public_key && (
         <details className="small">
           <summary>아직 켤 수 없어요 · 관리자용</summary>
           <div className="stack" style={{ gap: 6, marginTop: 6 }}>
