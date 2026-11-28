@@ -170,6 +170,8 @@ export function MailView({ onBack, onCampaigns, onWaiting, seed = null, onSeedUs
       {/* 아직 연결 안 됨: 관리자 비밀값 대신 여기서 바로 연결(그림 따라하기·붙여 넣기·연결 시험) */}
       {data && !data.connected && <ConnectCard inMail onConnected={() => { api<MailData>('/api/mail').then(apply).catch(e => fail(e, '메일을 불러오지 못했어요.')); }} />}
       {data?.error && <p className="error small" role="alert" style={{ margin: 0 }}>{data.error}</p>}
+      {/* 로그인이 틀렸으면 오류 아래에 바로 다시 연결(그림 안내 창) */}
+      {data?.connected && data.error && /로그인|비밀번호/.test(data.error) && <ConnectCard inMail onConnected={() => { api<MailData>('/api/mail').then(apply).catch(e => fail(e, '메일을 불러오지 못했어요.')); }} />}
 
       <SourceSwitch note={source === 'naver' ? '네이버 메일만 보여요' : 'Gmail만 보여요'} />
       {camps.length > 0 && <DealStrip campaigns={camps} onCampaigns={onCampaigns} />}

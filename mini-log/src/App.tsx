@@ -32,6 +32,7 @@ import { SocialPosts } from './SocialPosts';
 import { ReviewCard } from './Review';
 import { MoreMenu } from './MoreMenu';
 import { showUndo, UndoToast } from './UndoToast';
+import { NextToast, showNext } from './NextToast';
 import { TagSets } from './TagSets';
 import { Lessons } from './Lessons';
 import type { Idea } from './Ideas';
@@ -304,6 +305,7 @@ function Workspace({ me, onLogout, onRenamed }: { me: Me; onLogout: () => void; 
   return (
     <div className={`shell${selected || view !== 'drafts' ? ' editing' : ''}`}>
       <UndoToast />
+      <NextToast />
       <CommandPalette commands={commands} />
       <aside className="side" aria-label="원고 목록">
         <div className="brand"><a className="brand-home" href="/" aria-label="미니로그 첫 화면으로(새로고침)"><Signature kind="minilog" word="log" size={17} tomong={32} /></a></div>
@@ -1005,6 +1007,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
       if (next === 'published') setPhotos(current => current?.map(p => ({ ...p, expires_at: (saved.published_at ?? Date.now()) + 30 * 86400000 })) ?? null);
       else setPhotos(current => current?.map(p => ({ ...p, expires_at: null })) ?? null);
       setMessage({ kind: 'info', text: next === 'published' ? '게시 완료로 기록했어요. 사진은 30일 뒤에 지워져요.' : '게시 기록을 취소했어요. 사진 삭제 예정도 취소했어요.' });
+      if (next === 'published') showNext('게시 완료! 다음: 인스타·스레드에도 올리고, 7일 뒤 돌아보기를 적어요.', 'SNS 글 만들기', () => document.getElementById('ed-publish')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (error) {
       setMessage({ kind: 'error', text: error instanceof Error ? error.message : '게시 상태를 바꾸지 못했어요.' });
     }
@@ -1254,7 +1257,7 @@ function Editor({ draft, gemini, onSaved, onCopied, onPhotoCount, onDeleted, onR
         {/* 힉의 법칙: 위쪽에는 지금 할 일 하나(원고 승인)만, 나머지는 ⋯ 안으로 */}
         <div className="actions">
           {fields.status !== 'published' && (
-            <button className={`btn${stage === 'approve' ? ' primary' : fields.status === 'approved' ? ' ghost' : ''}`} onClick={() => change({ status: fields.status === 'approved' ? 'draft' : 'approved' })}>{fields.status === 'approved' ? '승인 취소' : '원고 승인'}</button>
+            <button className={`btn${stage === 'approve' ? ' primary' : fields.status === 'approved' ? ' ghost' : ''}`} onClick={() => { const to = fields.status === 'approved' ? 'draft' : 'approved'; change({ status: to }); if (to === 'approved') showNext('승인했어요. 다음: 한 번에 복사해서 블로그에 올리고 게시 주소를 넣어요.', '올리기 칸으로', () => document.getElementById('ed-publish')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{fields.status === 'approved' ? '승인 취소' : '원고 승인'}</button>
           )}
           <MoreMenu label="원고 메뉴">
             <button type="button" className="btn ghost" onClick={() => { void copyAll(); }} disabled={!fields.title.trim() && !fields.body.trim()}>한 번에 복사</button>

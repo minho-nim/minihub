@@ -4,6 +4,7 @@ import { BriefCard, type Brief } from './Brief';
 import { todayKst, won, type Campaign } from './Campaigns';
 import { SourceSwitch, mailInSource, useSource } from './source';
 import { Skeleton } from './Skeleton';
+import { FirstCheck } from './FirstCheck';
 
 // 오늘 보드(첫 화면): 지금 할 일 · 다가오는 7일 · 답장할 메일 · 진행 흐름(협찬·내 글 한 줄씩) · 블로그/받을 돈/연결 계정.
 // 기능을 이어서 보여 주고, 누르면 그 화면으로 간다. 보는 계정(전체·네이버·구글)으로 일정·메일을 거른다.
@@ -91,6 +92,7 @@ export function TodayBoard({ user, name, drafts, onOpenDraft, onCreate, onGo }: 
 
   return (
     <div className="today" aria-label="오늘 보드">
+      <FirstCheck name={name} drafts={drafts.length} onGo={t => onGo(t)} onCreate={onCreate} />
       <SourceSwitch note={source === 'naver' ? '네이버 일정·메일만' : '구글 일정·Gmail만'} />
       {brief === null ? <Skeleton rows={3} label="오늘 할 일을 불러오는 중…" /> : <BriefCard hero name={name} data={brief} onGo={t => onGo(t === 'drafts' ? 'calendar' : t)} drafts={drafts} onOpenDraft={onOpenDraft} onCreate={onCreate} onIdeas={() => onGo('ideas')}>
         <div className="today-side">
